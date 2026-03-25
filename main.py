@@ -1,10 +1,12 @@
 import os
 from dotenv import load_dotenv
+from telegram import BotCommand
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     filters,
 )
 
@@ -13,9 +15,20 @@ import handlers
 load_dotenv()
 
 
+async def post_init(application: Application) -> None:
+    await application.bot.set_my_commands(
+        [
+            BotCommand("start", "Справка и команды"),
+            BotCommand("help", "Справка и команды"),
+            BotCommand("random", "Случайная непрочитанная ссылка"),
+            BotCommand("list", "Пять случайных непрочитанных"),
+        ]
+    )
+
+
 def main() -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    app = ApplicationBuilder().token(token).build()
+    app = ApplicationBuilder().token(token).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", handlers.cmd_help))
     app.add_handler(CommandHandler("help", handlers.cmd_help))

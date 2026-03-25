@@ -1,10 +1,16 @@
 import os
+import re
+
 import anthropic
 from dotenv import load_dotenv
+
+import prompts
 
 load_dotenv()
 
 _client: anthropic.AsyncAnthropic | None = None
+
+MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
 
 
 def get_client() -> anthropic.AsyncAnthropic:
@@ -14,19 +20,71 @@ def get_client() -> anthropic.AsyncAnthropic:
     return _client
 
 
-async def summarize_url(url: str, title: str | None = None) -> str:
-    """Ask Claude to summarize what a URL is about."""
-    title_hint = f' (titled "{title}")' if title else ""
-    prompt = (
-        f"I saved this link{title_hint}: {url}\n\n"
-        "In 2-3 sentences, describe what this page is likely about based on the URL and title. "
-        "Be concise and useful — this is a reading list note to my future self."
-    )
+def detect_content_language(text: str | None) -> str:
+    """Return 'ru' or 'en' for summary default language."""
+    if not text:
+        return "en"
+    sample = text[:4000]
+    cyr = len(re.findall(r"[\u0400-\u04FF]", sample))
+    lat = len(re.findall(r"[A-Za-z]", sample))
+    if cyr > lat * 0.15:
+        return "ru"
+    return "en"
 
+
+def telegram_lang_to_name(code: str | None) -> str:
+    if not code:
+        return "English"
+    c = code.lower().split("-")[0]
+    if c == "ru":
+        return "Russian"
+    return "English"
+
+
+def summary_output_language_name(content_lang: str, target: str) -> str:
+    """target is 'article' | 'en' | 'ru'."""
+    if target == "article":
+        return "Russian" if content_lang == "ru" else "English"
+    if target == "ru":
+        return "Russian"
+    return "English"
+
+
+async def article_preview(
+    url: str,
+    *,
+    user_language_name: str,
+    article_text: str | None,
+) -> str:
+    prompt = prompts.format_preview_prompt(
+        user_language=user_language_name,
+        url=url,
+        article_text=article_text or "",
+    )
     client = get_client()
     message = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=256,
+        model=MODEL,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()
+
+
+async def article_summary(
+    article_text: str | None,
+    *,
+    content_lang: str,
+    target: str,
+) -> str:
+    lang_name = summary_output_language_name(content_lang, target)
+    prompt = prompts.format_summary_prompt(
+        article_text=article_text or "",
+        output_language=lang_name,
+    )
+    client = get_client()
+    message = await client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )
     return message.content[0].text.strip()
