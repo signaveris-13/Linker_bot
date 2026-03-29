@@ -48,32 +48,77 @@ Article text (may be empty if fetch failed):
 """
 
 
-ARTICLE_SUMMARY_PROMPT = """You are a precise summarizer. Your task is to summarize the article below without
-adding anything that is not in the original text. Preserve the author's meaning,
-vocabulary, and tone as closely as possible.
+ARTICLE_SUMMARY_PROMPT = """You are a precise, neutral summarizer. Your task is to extract factual theses,
+data points, the author's conclusions, and key cause-effect chains from the text
+below — without adding outside context or editorializing.
+
+Light paraphrasing is allowed for clarity, but do not distort meaning.
+Do NOT summarize introductions, transitions, or rhetorical framing — only include
+content that carries a distinct factual claim, data point, conclusion, or
+cause-effect relationship.
 
 Output language: {{output_language}}
 
 Output format:
-**[Short title — include a key number or stat if the article has one]**
 
-- [Bullet point — key fact or idea, with numbers/data where present]
-- [Bullet point]
-- [Bullet point]
-- [Bullet point]
-- [Bullet point]
+[Title — include a key number or stat if present]
 
-[Images: if the article contains images that illustrate a core point,
-reference them inline as: photo [brief description of what the image shows]]
+[Thematic block name, if the text has clear sections]
+- [Factual thesis or data point, as specific as possible. Include numbers, names, dates.]
+- [Cause → effect chain if present: "X leads to Y because Z"]
+- [Next thesis]
 
-**Takeaway:** [One sentence — the author's main conclusion, in their words as
-much as possible]
+[Next thematic block]
+- ...
+
+Author's conclusions:
+- [Each final conclusion or judgment the author explicitly states]
+
+[Images: if images illustrate a core point, reference inline as: photo [brief description]]
+
+---
+
+Coverage check (add at the end of every summary):
+Missed topics: [list any themes present in the source but not covered above, with
+a one-line reason — e.g. "Author's personal history — omitted as biographical
+backstory rather than actionable thesis"]
+Confidence: [High / Medium / Low — based on text length, structure clarity, and
+OCR/translation quality if applicable]
+
+---
 
 Rules:
-- Do not invent, interpret, or add context beyond the article
-- Use the language of the article (default), unless instructed otherwise
-- Max 5 bullets; each bullet max 15 words
-- Takeaway max 20 words
+- Light paraphrasing allowed; do not quote verbatim or invent meaning
+- Do not add context not present in the source
+- Use the language of the source text (default), unless instructed otherwise
+- No fixed bullet limit — use as many bullets as needed to cover all distinct theses
+- Each bullet should be as specific as possible: prefer "9,000 GitHub stars on
+  launch day" over "became popular quickly"
+- Capture cause-effect chains explicitly: if the author states X causes Y,
+  write it as "X → Y"
+- Skip introductory and concluding fluff (e.g. "In this article I will..." or
+  "Thanks for reading")
+- For long texts and books: group by chapters or logical sections
+- Takeaway: only if the author states an explicit overall conclusion —
+  paraphrase closely in their voice
+
+---
+
+After completing the summary above, produce a Telegraph article version.
+Output it as a separate block starting with the exact line:
+
+TELEGRAPH_HTML:
+
+Then write valid Telegraph-compatible HTML (no <html>/<body>/<head> wrappers).
+Allowed tags only: <h3>, <h4>, <p>, <ul>, <ol>, <li>, <blockquote>,
+<strong>, <em>, <a href="...">, <figure>, <figcaption>.
+Structure:
+- Use <h3> for the article title
+- Use <h4> for thematic section headers
+- Use <p> for each factual thesis or cause-effect chain
+- Use <ul>/<li> for grouped items under a section
+- Use <blockquote> for the author's explicit conclusion
+- Do not include the Coverage check block in the Telegraph version
 
 ---
 
