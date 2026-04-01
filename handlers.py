@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 import db
 import metadata
 import summarizer
+import telegraph
 
 URL_PATTERN = re.compile(r"https?://[^\s<>]+", re.I)
 
@@ -119,21 +120,18 @@ def link_keyboard(link: dict, locale: str) -> InlineKeyboardMarkup:
     )
 
 
-def summary_keyboard(link: dict, locale: str) -> InlineKeyboardMarkup:
+def summary_keyboard(link: dict, locale: str, telegraph_url: str | None = None) -> InlineKeyboardMarkup:
     lid = link["id"]
-    return InlineKeyboardMarkup(
+    rows = [
         [
-            [
-                InlineKeyboardButton(t(locale, "lang_en"), callback_data=f"s:{lid}:en"),
-                InlineKeyboardButton(t(locale, "lang_ru"), callback_data=f"s:{lid}:ru"),
-            ],
-            [
-                InlineKeyboardButton(
-                    t(locale, "mark_read"), callback_data=f"r:{lid}"
-                ),
-            ],
-        ]
-    )
+            InlineKeyboardButton(t(locale, "lang_en"), callback_data=f"s:{lid}:en"),
+            InlineKeyboardButton(t(locale, "lang_ru"), callback_data=f"s:{lid}:ru"),
+        ],
+    ]
+    if telegraph_url:
+        rows.append([InlineKeyboardButton("📖 Telegraph", url=telegraph_url)])
+    rows.append([InlineKeyboardButton(t(locale, "mark_read"), callback_data=f"r:{lid}")])
+    return InlineKeyboardMarkup(rows)
 
 
 def format_card_html(title: str, url: str, preview: str) -> str:
@@ -372,7 +370,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 cached_summary_lang=key,
             )
 
-        body_trunc = body
+        summary_text_only, telegraph_html = summarizer.split_summary_and_telegraph(body)
+
+        telegraph_url: str | None = None
+        if telegraph_html:
+            title = link.get("title") or link["url"]
+            telegraph_url = await telegraph.create_page(title, telegraph_html)
+
+        body_trunc = summary_text_only
         summary_text = ""
         for _ in range(4):
             summary_text = (
@@ -388,13 +393,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.edit_message_text(
                 summary_text,
                 parse_mode="HTML",
-                reply_markup=summary_keyboard(link, locale),
+                reply_markup=summary_keyboard(link, locale, telegraph_url),
             )
         except Exception:
             await query.message.reply_text(
                 summary_text,
                 parse_mode="HTML",
-                reply_markup=summary_keyboard(link, locale),
+                reply_markup=summary_keyboard(link, locale, telegraph_url),
             )
         return
 

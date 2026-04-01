@@ -70,6 +70,17 @@ async def article_preview(
     return message.content[0].text.strip()
 
 
+def split_summary_and_telegraph(text: str) -> tuple[str, str | None]:
+    """Split model output into (summary_text, telegraph_html | None)."""
+    marker = "TELEGRAPH_HTML:"
+    idx = text.find(marker)
+    if idx == -1:
+        return text.strip(), None
+    summary = text[:idx].strip()
+    telegraph_html = text[idx + len(marker):].strip()
+    return summary, telegraph_html or None
+
+
 async def article_summary(
     article_text: str | None,
     *,
