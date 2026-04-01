@@ -10,7 +10,7 @@ load_dotenv()
 
 _client: anthropic.AsyncAnthropic | None = None
 
-MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 
 def get_client() -> anthropic.AsyncAnthropic:
